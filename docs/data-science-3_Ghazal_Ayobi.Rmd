@@ -1,0 +1,1013 @@
+---
+title: "DeppHeard Trial: What really is Happening  in Media?"
+subtitle: "Text and Sentiment Analysis"
+author: "Ghazal Ayobi"
+output:
+  html_document:
+    theme: flatly
+    toc: yes
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, messages = FALSE, fig.align = 'center')
+
+```
+
+```{r message=FALSE, warning=FALSE}
+library(guardianapi)
+library(rjson)
+library(RJSONIO)
+library(RColorBrewer)
+library(widyr)
+library(ggraph)
+library(tidygraph)
+library(topicmodels)
+library(ggplot2)
+library(gridExtra)
+library(wordcloud)
+library(NLP)
+library(igraph)
+library(stringr)
+library(data.table)
+library(ggplot2)
+library(reshape2)
+library(stringi)
+library(viridis)
+library(twitteR)
+library(dplyr)
+library(scales)
+library(httr)
+library(qdapRegex)
+library(tm)
+library(tidyverse)
+library(tidyr)
+library(tidytext)
+library(kableExtra)
+library(plotly)
+library(textclean)
+source('secret.R')
+data("stop_words")
+# Lexicons
+nrc <- get_sentiments("nrc")
+bing <- get_sentiments("bing")
+afinn <- get_sentiments("afinn")
+
+theme_set(theme_bw() +
+            theme( panel.grid.minor.x = element_blank(), 
+                                 plot.title = element_text( size = 12, face = "bold", hjust = 0.5 ) ))
+
+```
+
+
+## Introduction
+
+### Motivation
+
+Amber Heard and Johnny Depp deformation trail starts on April 11, 2022. The trail is broadcast on Court TV which has grasped many attentions of friends and colleagues but also social media. On different social platforms many publications can be observed. The history of this trail goes back to the time when Johnny Depp sued Amber Heard in March 2019 for alleging a column, she wrote in The Washington Post for domestic violence, and she was asking for 50 million dollars in damages. Moreover, Heard also filed a 100 million dollars court suit. Following the news of this event on different social media platforms I realized that there are various perspectives on each side. I would like to evaluate how Amber Heard and Johnny Depp are associated with different perspectives. 
+
+### Hypothesis
+
+Based on Laurel Anderson, Depp and Heard’s former couples therapist, testified that she considered the two of them to be “mutually abusive. However, on the social media platforms, it can be seen that Amber Heard receives more hate speeches. I would like to evaluate that Amber Heard is not only targeted by hate speech on social platforms like twitter, but she is also associated with negative speech on newspaper journals. 
+
+
+### Data Collection
+
+For the purpose of this project I am using two data sources which are tweets and the Guardian articles. For both of the sources I use an API to collect data. 
+
+### Twitter
+
+To receive access to the tweets data, I created a developer's account in the Twitter's developer's portal. As a result, I used the Twitter's access and secret keys to call an API. I used top four trending hash-tags about Amber Heard and Johnny Depp trial which are as following: `JohnnyDepp`, `JusticeforJohnnyDepp`, `AmberHeard` and `IStandWithAmberHeard`. As a result I wrote the twitter data into a csv files. I removed the re-tweets and duplicates, and I only selected English language tweets. From twitter statistics it can be seen that there are thousands of tweets for these hash-tags every hour, Thus, I decided to call API on  different days. As a result I removed the duplicates and combined the data sets.
+
+
+### The Guardian
+
+Beside the tweets data, I wanted to strengthen the data set with well known news articles. For this purposes, I use the Guardian API. In order to access the Guardian articles, I created a developer's account of the mentioned online newspaper on it developer's website to receive my API secret key. In the API request query I added `AmberHeard` OR `JohnnyDepp` tags to import all the articles from January 1, 2022 to May 8, 2022. As a result of data cleaning I received 20 articles from 200 request.
+
+
+## Data Cleaning
+
+I collected data by calling different API request to Twitter developer's portal and the Guardian platform. As a result I combined all these files to csv files and uploaded the compiled version to my github to directly access the data. 
+
+### Twitter
+
+I sent different and multiple requests to the Twitter API, the reason for this is the DeppHeard trail has many trending hash tags and based on project goal tweets are needed for different day. Below is a sample of the combined data. 
+
+```{r eval=FALSE}
+# Twitter credentials
+consumerKey = TWITTER_CONSUMER_KEY
+consumerSecret = TWITTER_CONSUMER_SECRET
+accessToken = TWITTER_ACCESS_TOKEN
+accessSecret = TWITTER_ACCESS_SECRET
+setup_twitter_oauth(consumerKey, consumerSecret, accessToken,accessSecret)
+
+```
+
+```{r eval=FALSE}
+
+# getting tweets for all JohnnyDepp hashtags 
+tt1 = searchTwitter('JohnnyDepp -filter:retweets', n = 10000, since = '2022-01-01', lang = 'en')
+JohnnyDepp <- twListToDF(tt1)
+
+# getting tweets for all JusticeforJohnnyDepp hashtags 
+tt2 = searchTwitter('JusticeforJohnnyDepp -filter:retweets', n = 10000, since = '2022-01-01', lang = 'en')
+JusticeforJohnnyDepp <- twListToDF(tt2)
+
+
+# binding the data 
+jd <- rbind(JohnnyDepp, JusticeforJohnnyDepp) 
+
+
+# getting tweets for all AmberHeard hashtags 
+tt3 = searchTwitter('AmberHeard -filter:retweets', n = 10000, since = '2022-01-01', lang = 'en')
+AmberHeard <- twListToDF(tt3)
+
+# getting tweets for all IStandWithAmberHeard hash tags 
+tt4 = searchTwitter('IStandWithAmberHeard -filter:retweets', n = 10000, since = '2022-01-01', lang = 'en')
+IStandWithAmberHeard <- twListToDF(tt4)
+
+# binding the data
+ah <- rbind(AmberHeard, IStandWithAmberHeard)
+
+
+
+# calling the API for second day
+# getting tweets for all JohnnyDepp hashtags 
+tt1 = searchTwitter('JohnnyDepp -filter:retweets', n = 10000, since = '2022-05-07', lang = 'en')
+JohnnyDepp <- twListToDF(tt1)
+
+# getting tweets for all JusticeforJohnnyDepp hashtags 
+tt2 = searchTwitter('JusticeforJohnnyDepp -filter:retweets', n = 10000, since = '2022-05-07', lang = 'en')
+JusticeforJohnnyDepp <- twListToDF(tt2)
+
+
+# binding the data 
+jd_2 <- rbind(JohnnyDepp, JusticeforJohnnyDepp) 
+
+
+# getting tweets for all AmberHeard hashtags 
+tt3 = searchTwitter('AmberHeard -filter:retweets', n = 10000, since = '2022-05-07', lang = 'en')
+AmberHeard <- twListToDF(tt3)
+
+# getting tweets for all IStandWithAmberHeard hash tags 
+tt4 = searchTwitter('IStandWithAmberHeard -filter:retweets', n = 10000, since = '2022-05-07', lang = 'en')
+IStandWithAmberHeard <- twListToDF(tt4)
+
+# binding the data
+ah_2 <- rbind(AmberHeard, IStandWithAmberHeard)
+
+# Combining the data frame
+twitter_df <- rbind(jd, jd_2, ah, ah_2)
+
+# selecting all the unique rows 
+twitter_df <- unique(twitter_df)
+
+# writing the csv file
+write.csv(twitter_df,"twitter_df.csv")
+
+```
+
+
+
+```{r message=FALSE, warning=FALSE}
+twitter_df <- read_csv('https://raw.githubusercontent.com/ghazalayobi/Data-Science-3/main/data/twitter_df.csv')
+
+twitter_df <- data.frame(twitter_df)
+twitter_df %>% 
+  head(2) %>%
+  kable(digits = 3,  booktabs = TRUE) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>% 
+  scroll_box(width = "100%")
+
+```
+
+
+It can be seen from the above table that the data set contains many columns Such as; text, favorited, favorite count, date created, and information about screen name and others. For the purpose of this project I will evaluate the `text` column. It is evident that tweets in the text column contain punctuation, digits, links, uni codes, screen names and other special characters. Thus, I created a function called `tweets_cleaner`, to clean the tweets text. Moreover, based on this project, I wanted to the list of hash tags used in the tweets. Thus, I created I list of all hash tags. 
+
+Below is an example of the tweets after the pre-processing it. The reason I keep the hash-tags text is I would like to evaluate the most shared tags.
+
+```{r}
+hashtags <- tolower(str_extract(twitter_df$text,'#([a-zA-Z0-9_]+)'))
+hashtags <- unlist(hashtags)
+hashtags <- data.frame(hashtags)
+```
+
+
+```{r}
+
+
+# creating tweets cleaner function
+tweets_cleaner <- function(tweet.df){
+  
+  tweets_txt <- tweet.df$text
+  clean_tweet = gsub("&amp", "", tweets_txt) # Remove Amp
+  clean_tweet = tolower(clean_tweet)
+  clean_tweet = gsub("@\\w+", "", clean_tweet) # Remove @
+  clean_tweet = gsub("#", " ", clean_tweet) # Before removing punctuations, add a space before every hashtag
+  clean_tweet = replace_contraction(clean_tweet) # replacing contractions
+  clean_tweet = gsub("[[:punct:]]", "", clean_tweet) # Remove Punct
+  clean_tweet = gsub("[[:digit:]]", "", clean_tweet) # Remove Digit/Numbers
+  clean_tweet = gsub("http\\w+", "", clean_tweet) # Remove Links
+  clean_tweet = gsub("[^[:alnum:][:blank:]?&/\\-]", "", clean_tweet) # Remove Unicode Char
+  clean_tweet <- str_replace_all(clean_tweet, "https://t.co/[a-z,A-Z,0-9]*","") # Get rid of URLs
+  clean_tweet <- str_replace_all(clean_tweet, "http://t.co/[a-z,A-Z,0-9]*","")
+  clean_tweet <- str_replace_all(clean_tweet,"@[a-z,A-Z]*","") # Get rid of references to other screennames
+  clean_tweet
+}
+
+# applying the tweets cleaner function on the data set
+twitter_df <- data.frame(tweets_cleaner(twitter_df)) %>% set_names('text')
+
+# adding hashtags
+
+hashtags <- removePunctuation(hashtags$hashtags)
+hashtags <- unlist(hashtags)
+hashtags <- data.frame(hashtags)
+twitter_df$hashtags <- hashtags$hashtags
+
+
+
+# a sample of cleaned text
+twitter_df <- data.frame(twitter_df)
+twitter_df$id <- 1:nrow(twitter_df)
+
+twitter_df %>% 
+  head(5) %>%
+  kable(digits = 3,  booktabs = TRUE, caption = "Cleaned Tweets Example") %>% 
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>% 
+  scroll_box(width = "100%")
+```
+
+
+
+### The Guardian
+
+The Guardian is one of the online news papers which supports API access to the its articles and it has been active during Depp-Heard trial. In order to access the Guardian articles, I requested for access key in the Guardian's developer platform. I used `Johnny Depp` and `Amber Heard` in the query function of the API URL to access articles from January 1, 2022 to May 8, 2022. As a result I received 200 articles which is the highest limit of the request. After the review of skimming through articles titles, I came to realization that many articles do not belong to the Depp-Heard trail. Thus, I saved the result of the articles for further analysis. The result from the Guardian API contains information about the articles, ID, Type, Section Id, Section name, publication date, title, link and the article body. For the purpose of this analysis I will only the following columns:
+
+- webTitle : is the title of the article
+
+- fields : is the body of the article
+
+- sectionId : is the category of publication. Such as, film, us-news or others
+
+
+From the below table it is can be seen that the articles' text contains special characters, punctuation, numbers and others. We can see that the text from text from tweets and articles have different nature. Thus, I created another function to clean the articles. I applied the function to the both title and body of the articles and removed unnecessary columns. 
+
+```{r eval=FALSE}
+# Calling the API key from the secret file
+api_key <- GUARDIAN_KEY
+
+# calling the API, the query is Johnny depp OR Amber heard, between 2022-01-01 and 2022-05-08, using the maximum page size
+url <- paste0("https://content.guardianapis.com/search?api-key=", api_key, '&q=johnny-depp%20OR%20amber-heard&show-fields=bodyText&page-size=200&from-date=2022-01-01&to-date=2022-05-08')
+
+#make the request
+raw <- getURL(url)
+
+# saving the data from Json document to data frame 
+df <- fromJSON(raw, nullValue = NA)
+
+# checking length of the result
+length <- length(df$response$results)#check the number of results
+length
+
+# creating a new data frame to save the API result
+news_data <- data.frame() 
+
+for(i in 1:length) {
+  new_row <- as.data.frame(df$response$results[[i]])
+  try({news_data <- rbind(news_data, new_row)}, silent=T)
+}
+
+# writing the articles
+write.csv(news_data, 'guardian-articles.csv')
+
+```
+
+```{r}
+# reading the guardian data frame 
+guardian_df <- read.csv('https://raw.githubusercontent.com/ghazalayobi/Data-Science-3/main/data/guardian-articles.csv') 
+guardian_df %>% 
+  head(2) %>%
+  select(-c('fields')) %>% 
+  kable(digits = 3,  booktabs = TRUE, caption = 'The Guardian Articles Example') %>% 
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>% 
+  scroll_box(width = "100%")
+```
+
+
+```{r}
+# selecting the main columns
+guardian_df <- guardian_df %>% 
+  select(webTitle, fields, sectionId)
+
+# creating an article cleaner function
+article_cleaner <- function(text){
+  
+  clean_article = tolower(text)
+  clean_article = gsub("@\\w+", "", clean_article) # Remove @
+  clean_article = gsub("#", " ", clean_article) # Before removing punctuations, add a space before every hashtag
+  clean_article = gsub("[[:punct:]]", "", clean_article) # Remove Punct
+  clean_article = gsub("[^[:alnum:][:blank:]?&/\\-]", "", clean_article) # Remove Unicode Char
+  clean_article = str_replace_all(clean_article, "[^a-zA-Z0-9]", " ")
+  clean_article = gsub("9d", "", clean_article)
+}
+
+# applying the article cleaner function to the articles body column and saving it as text
+guardian_df$text <- article_cleaner(guardian_df$fields)
+
+# appying the article cleaner function to the articles' titles and saving it as title
+guardian_df$title <- article_cleaner(guardian_df$webTitle)
+
+# removing the unnecessary columns
+guardian_df <- guardian_df %>% select(-c(fields, webTitle))
+```
+
+## Text Processing
+
+In the text processing section, I processed both text data sets individually. I used `tidytext` package for this purpose. I extended stop words list, as there are some subject and TO BE verbs with out contractions. To mention, I also added `replace_contractions` function to come across this issue. 
+
+### Twitter
+
+To convert words into token for the twitter data set, I created a list of un-nest tokens and remove the stop words which is shown as following. 
+
+```{r}
+# adding custom strop words
+custome_words <- data.frame(word = c('im', 'dont', 'isnt', 'shes'), lexicon = c('SMART', 'SMART',  'SMART', 'SMART'))
+stop_words <- rbind(stop_words, custome_words)
+```
+
+
+```{r}
+# Applying the tidy text to get the unnested tokens for both data sets and remove the stop words
+
+# Johnny Depp Data Set
+tidy_tweets <- twitter_df  %>%
+  unnest_tokens(word, text) %>% 
+  anti_join(stop_words, by = "word")
+
+tidy_tweets %>% 
+  count(word, sort = TRUE) %>% 
+  head(6) %>%  
+  kable(digits = 3,  booktabs = TRUE, caption = 'Twitter Tokenzined words') %>% 
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = T)
+
+
+```
+
+### The Guardian
+
+For the Guardian articles, I also used `tidytext` package to get unnest-tokens. However, these articles required more pre processing steps. Based on my initial review of articles titles, I discovered that there are many articles unrelated to the project topic. I created four column to check whether either Johnny Depp or Amber Heard names are mentioned in the body of articles in otherwise case, I removed those articles. In addition, there has also been three cases where they had either of those two names. However, the topic of those articles were not related. I checked most of the articles regarding Depp-Heard trail, they were published under section of `film` or `US news`, thus I kept only those articles which were published under film or US news sections. As a result, I created tidy articles list of  unnest-tokens list and removed stop words. 
+
+```{r message=FALSE, warning=FALSE}
+guardian_df$jdepp <- str_count(guardian_df$text, "johnny depp")
+guardian_df$aheard <- str_count(guardian_df$text, "amber heard")
+guardian_df$aheard2 <- str_count(guardian_df$title, "heard")
+guardian_df$jdepp2 <- str_count(guardian_df$title, "depp")
+
+
+guardian_df <- guardian_df[guardian_df$sectionId == 'film' | guardian_df$sectionId == 'us-news', ]
+guardian_df <- guardian_df[guardian_df$jdepp != 0 & guardian_df$aheard != 0, ]
+
+
+remove_df <- filter(guardian_df, jdepp2 == 0 & aheard2 == 0)
+guardian_df <- anti_join(guardian_df, remove_df)
+rm(remove_df)
+
+guardian_df <- guardian_df %>% select(-c(sectionId, jdepp, jdepp2, aheard, aheard2))
+
+guardian_df$id <- 1:nrow(guardian_df)
+
+write.csv(guardian_df, 'guardian-articles-clean.csv', row.names = FALSE)
+
+```
+
+
+```{r message=FALSE, warning=FALSE}
+# Reading the CSV
+guardian_df <- read.csv('guardian-articles-clean.csv') 
+
+
+tidy_articles <-  guardian_df %>%
+  unnest_tokens(word, text)
+
+data(stop_words)
+tidy_articles <- tidy_articles %>%
+  anti_join(stop_words)
+
+tidy_articles %>%
+  count(word, sort = TRUE) %>% 
+  head(6) %>%  
+  kable(digits = 3,  booktabs = TRUE, caption = 'The Guardian Tokenized' ) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = T)
+
+
+```
+
+
+## Explanatory Text Analysis
+
+Visualizing the result of the most common words in both articles and tweets. Tweets reveal interesting findings that the most common word is `JusticeforJohnnyDepp` which has a frequency of more than 8000. It shows the large number of people who support Johnny Depp. Moreover, we can also see a hash tag `IStandwithAmberHeard`. In the further parts we will explore how these hash tags are linked with other words. 
+
+```{r message=FALSE, warning=FALSE}
+# plot 10 most common words for Johnny Depp Data set
+p1 <- tidy_tweets %>%
+  count(word, sort = TRUE) %>%
+  head(20) %>% 
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) +
+  geom_col(aes(fill = n), show.legend = F, fill = '#86bf91') +
+  xlab(NULL) +
+  coord_flip() +
+  ylab('Frequency') +
+  ggtitle('Top 20 Words from Tweets')
+
+# plot 10 most common words
+p2 <- tidy_articles %>%
+  count(word, sort = TRUE) %>%
+  head(20) %>% 
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) +
+  geom_col(aes(fill = n), show.legend = F, fill = '#86bf91') +
+  xlab(NULL) +
+  coord_flip() +
+  ylab('Frequency') +
+  ggtitle('Top 20 Words from Articles')
+
+grid.arrange(p1, p2, ncol = 2) 
+```
+
+
+The below word cloud indicates many words variation in tweets. On the other hand, we can see that the most two words used in the articles are `Depp` and `Heard`. The interesting findings from below word cloud is two of the most tweeted hash tags are `AmberHeardIsaLiar` and `AmberHeardIsAPsychopath` indicating the number of hate speech has received. 
+
+
+```{r message=FALSE, warning=FALSE}
+
+# word cloud 
+
+# defining color palette
+pal <- brewer.pal(8,"Dark2")
+
+set.seed(1)
+#Creating word cloud of most frequent words
+tidy_tweets %>%
+  count(word) %>%
+  with(wordcloud(word, n, max.words =100, min.freq = 100, font = 0.1, colors = pal))
+tidy_articles %>%
+  count(word) %>%
+  with(wordcloud(word, n, max.words =100, colors = pal))
+
+```
+
+
+
+The below word correlation scatter plot shows the frequency of words in both data sets. We can see that the percentage of words `Johnny` and `Amber` is more than ten thousand percentage compared to the 10% in articles. It is a well known fact that the frequency of these two names should be higher. On the other hand, we can words such as _court_, _abuse_, and _testimony_ are used indicating the on going trail tension. 
+
+
+```{r message=FALSE, warning=FALSE}
+# twitter and the gaurdian words correlation 
+
+frequency_tweets <- tidy_tweets %>% 
+  mutate(word = str_extract(word, "[a-z']+")) %>%
+  count(word) %>% 
+  mutate(proportion_tweets = n / sum(n)) %>% 
+  select(-n)
+
+frequency_articles <- tidy_articles %>% 
+  mutate(word = str_extract(word, "[a-z']+")) %>%
+  count(word) %>% 
+  mutate(proportion_articles = n / sum(n)) %>% 
+  select(-n)
+
+frequency <- inner_join(frequency_tweets, frequency_articles, by = 'word')
+
+# expect a warning about rows with missing values being removed
+ggplot(frequency, aes(x = proportion_tweets , y = proportion_articles)) +
+  geom_abline(color = "gray40", lty = 2) +
+  geom_jitter(alpha = 0.5, size = 2.5, width = 0.3, height = 0.3, color = '#86bf91') +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.001), 
+                       low = "darkslategray4", high = "gray75") +
+  labs(x = 'Proportion of words in Tweets', y = 'Proportion of words in Articles')
+
+```
+
+
+
+## Sentiment Analysis
+
+In both of the media websites people play an important role. With this in mind, sentiment analysis is a major part of evaluation of human reaction to a situation. Thus,for this project I consider two different types of media platforms. One where people share their ideas , in most of the cases, without any additional revision such as Twitter, the second source which is The Guardian articles, these have different nature.For example, these articles are reviewed, polished and published as a result. My main aim for considering these two media platform is to compare and contrast, how Amber Heard and Johnny Depp trail is associated with different different sentiments. 
+
+To being with, for this reason, I evaluate three different types of sentiment lexicons: _NRC_, _Bing_ and _Afinn_ for both tweets and the guardian articles. 
+
+_AFINN_ lexicon assigns words with a score between -5 and 5. Negative sentiment containing negative score and positive sentiment has a positive score. _Bing_ lexicon categorizes words into a positive and negative categories and finally the _NRC_ lexicon categorizes words into positive, negative, anger, anticipation, disgust, fear, joy, sadness, surprise and trust.
+
+
+The result from three sentiment lexicons indicate interesting findings. For the tweets data set we can see that most of the tweets has negative sentiment across three lexicons. On the other hand, it is observable that based on the _AFINN_ and _Bing_ lexicons all of the articles are negative. However, _NRC_ indicates three positive articles. 
+
+From the result of sentiment lexicons we can say that based on the seriousness of the trail, there are many negative words associated with the situation. As a result, I choose _Bing_ sentiment lexicon to categorize words into positive and negative categories. 
+
+```{r message=FALSE, warning=FALSE}
+# three lexicons result for twitters data
+
+# creating a data frame of row numbers and unnest tokens
+tweets_group <- twitter_df %>%
+  mutate(linenumber = row_number()) %>% 
+  unnest_tokens(word, text)
+
+# AFINN LEXICON
+afinn <- tweets_group %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  group_by(index = linenumber %/% 80) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "AFINN")
+
+# Bing and NRC lexicon
+bing_and_nrc <- bind_rows(
+  tweets_group %>% 
+    inner_join(get_sentiments("bing")) %>%
+    mutate(method = "Bing et al."),
+  tweets_group %>% 
+    inner_join(get_sentiments("nrc") %>% 
+                 filter(sentiment %in% c("positive", 
+                                         "negative"))
+    ) %>%
+    mutate(method = "NRC")) %>%
+  count(method, index = linenumber %/% 80, sentiment) %>%
+  pivot_wider(names_from = sentiment,
+              values_from = n,
+              values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+
+# visualizing the reuslt 
+
+bind_rows(afinn, 
+          bing_and_nrc) %>%
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(show.legend = FALSE, fill = '#86bf91') +
+  facet_wrap(~method, ncol = 1, scales = "free_y") +
+  labs(title = "Tweets Sentiment Analysis")
+```
+
+
+```{r message=FALSE, warning=FALSE}
+# three lexicons result for the guardian articles
+articles_group <- guardian_df %>% 
+  mutate(linenumber = row_number()) %>% 
+  unnest_tokens(word, text)
+
+# 1) comparing the three sentiment dictionaries
+afinn <- articles_group %>%  inner_join(get_sentiments("afinn")) %>% 
+  group_by(index = linenumber) %>% 
+  summarise(sentiment = sum(value)) %>% 
+  mutate(method = "AFINN")
+
+bing_and_nrc <- bind_rows(
+  articles_group %>% 
+    inner_join(get_sentiments("bing")) %>%
+    mutate(method = "Bing et al."),
+  articles_group %>% 
+    inner_join(get_sentiments("nrc") %>% 
+                 filter(sentiment %in% c("positive", 
+                                         "negative"))
+    ) %>%
+    mutate(method = "NRC")) %>%
+  count(method, index = linenumber, sentiment) %>%
+  pivot_wider(names_from = sentiment,
+              values_from = n,
+              values_fill = 0) %>% 
+  mutate(sentiment = positive - negative)
+
+bind_rows(afinn, 
+          bing_and_nrc) %>%
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(show.legend = FALSE, fill = '#86bf91') +
+  facet_wrap(~method, ncol = 1, scales = "free_y") +
+  labs(title = "Articles Sentiment Analysis")
+```
+
+As we have seen in the previous plots that twitter and the guardian data have higher negative sentiment. Now, it is important to see what are the those negative or positive words. The below plots show that both data from articles and tweets have higher value of negative words. In both articles and tweets the negative words are abuse which the highest, other words are fake, lying and other. On the other hand positive have the same top word love
+
+
+```{r message=FALSE, warning=FALSE, out.width="90%"}
+# most common positive and negative words using bing lexicon
+
+bing_tweets_count <- tidy_tweets %>%
+  inner_join(bing) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+bing_articles_count <- tidy_articles %>%
+  inner_join(bing) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+# plot
+p1 <- bing_tweets_count %>%
+  group_by(sentiment) %>%
+  slice_max(n, n = 10) %>% 
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(n, word, fill = sentiment)) +
+  geom_col(show.legend = FALSE, fill = '#86bf91') +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(x = NULL,
+       y = NULL, title = 'Tweets:Positive and Negative Words')
+
+p2 <- bing_articles_count %>%
+  group_by(sentiment) %>%
+  slice_max(n, n = 10) %>% 
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(n, word, fill = sentiment)) +
+  geom_col(show.legend = FALSE, fill = '#86bf91') +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(x = NULL,
+       y = NULL, title = 'Articles:Positive and Negative Words')
+
+grid.arrange(p1, p2, ncol = 2) 
+```
+
+## TF-IDF Analysis 
+
+In the previous sections we have found the most common words along with positive and negative words, using different sentiment lexicons. In the natural language processing it is significant to understand what is the main topic of the text. One approach is TF-IDF which measures how important a word is to a document in a collection of documents. 
+
+### Twitter 
+
+To find the most common words in each topic for the Twitter data, I initially extracted hash-tags from the tweets. As it is true that in one tweet there can be multiple hash tags, I consider the first tag for the purpose of Analysis. Based on the previous sections result, it is clear that the most used tags are _JohnnyDepp_, _AmberHeard_, _JusticeForJohnnyDepp_, and _IStandWithAmberHeard_. Thus, I used these four to categorize the words and topics. It is interesting to see that under the topic of _JusticeForJohnnyDepp_ we can tags such as: i stand with Johnny Depp, Amber heard is a liar, Johnny Depp is innocent, and more. This point proves the hypothesis that Amber Heard is associated with many negative words in the social media platforms. 
+
+### The Guardian 
+
+The Guardian articles do not have any sub categories for this trail. In order to categorize these articles, I calculated the most frequency of names. For example, If in a specific article _Heard_ is mentioned more than _Depp_ I categorized it as _Heard_. From the Guardian articles we do not see very strong TF-IDF score. It indicates the variety in the text of these articles. 
+
+```{r message=FALSE, warning=FALSE}
+# tweets TF-IDF
+twitter_df <- drop_na(twitter_df)
+
+tweets_words <- twitter_df %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words, by = "word") %>% 
+  count(hashtags, word, sort = TRUE)
+
+# total frequency by id
+total_words <- tweets_words %>% 
+  group_by(hashtags) %>% 
+  summarize(total = sum(n))
+
+
+# join the df-s
+tweets_words <- left_join(tweets_words, total_words)
+
+# get tf-idf
+tweets_tf_idf <- tweets_words %>%
+  bind_tf_idf(word, hashtags, n) 
+
+tweets_tf_idf %>%
+  select(-total) %>%
+  arrange(desc(tf_idf)) %>% 
+  head(10) %>% 
+  select(hashtags, word, tf_idf) %>% 
+  kbl(caption = "Top 10 Words with Highest TF-IDF Scores",
+      col.names = c('Hashtags', 'Word', 'TF-IDF')) %>%
+  kable_minimal()
+
+
+```
+
+
+```{r message=FALSE, warning=FALSE}
+# plot 
+tweets_tf_idf %>%
+  group_by(hashtags) %>%
+  filter(hashtags %in% c('johnnydepp', 'amberheard', 'justiceforjohnnydepp', 'istandwithamberheard')) %>% 
+  slice_max(tf_idf, n = 15) %>%
+  ungroup() %>%
+  ggplot(aes(tf_idf, fct_reorder(word, tf_idf), fill = hashtags)) +
+  geom_col(show.legend = FALSE, fill = '#86bf91') +
+  facet_wrap(~ hashtags, ncol = 2, scales = "free") +
+  labs(x = 'TF-IDF Score', title = 'Tweets: words with Highest TF-IDF Scores', y = NULL)
+```
+
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# articles TF-IDF
+depp <- str_count(guardian_df$text, "depp")
+heard <- str_count(guardian_df$text, "heard")
+guardian_df <- cbind(guardian_df, depp)
+guardian_df <- cbind(guardian_df, heard)
+guardian_df$deppheard <- heard - depp
+
+check <- function(x) {
+  if (x> 0){
+  result <- print('heard')
+    } else {
+  result <- print('depp')
+    }
+  return(result)
+}
+
+result <- data.frame(unlist(lapply(guardian_df$deppheard, check))) %>% set_names('result')
+guardian_df$result <- result$result
+
+guardian_df <- guardian_df %>% 
+  select(-c(heard, depp, deppheard))
+
+articles_words <- guardian_df %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words, by = "word")
+
+articles_words <- articles_words %>% count(result, word, sort = TRUE)
+
+# total frequency by id
+total_words <- articles_words %>% 
+  group_by(result) %>% 
+  summarize(total = sum(n))
+
+# join the df-s
+articles_words <- left_join(articles_words, total_words)
+
+
+
+```
+
+```{r}
+# get tf-idf
+articles_tf_idf <- articles_words %>%
+  bind_tf_idf(word, result, n)
+set.seed(123)
+# Highest tf-idf words in each result
+articles_tf_idf %>%
+  group_by(result) %>%
+  slice_max(tf_idf, n = 15) %>%
+  ungroup() %>%
+  ggplot(aes(tf_idf, fct_reorder(word, tf_idf), fill = result)) +
+  geom_col(show.legend = FALSE, fill = '#86bf91') +
+  facet_wrap(~result, ncol = 2, scales = "free") +
+  labs(x = 'TF-IDF Score', y = NULL, title = "Articles : Words with highest TF-IDF score", caption = "Source: The Guardian")
+```
+
+
+## Tokenizing by n-gram
+
+So far in this project, unnest_tokens function has been used to tokenize the words. It is important to analyze that which word is followed by the other. It provides information about relationships in the data. In the following section, I will use _bigrams_ to pair the words. 
+
+### Twitter 
+
+The bigrams in the Twitter data illustrates interesting findings. We can that _JusticeForJohnnyDepp_ is paired with _IStandWithJohnnyDepp_, _AmberHeardIsALiar_. This indicates people support for Johnny Depp and Amber Heard is targated by hate speech. 
+
+### The Guardian
+
+In the case of Bigrams, The Guardian articles provides a general overview of the situation. Such as it provides information about domestic violence, domestic abuse and interestingly about Elon Musk indicating his name involvement with the trial. 
+
+```{r message=FALSE, warning=FALSE}
+# pairs of bigrams
+twitter_df %>% 
+  unnest_tokens(word, text, token = "ngrams", n = 2) %>% 
+  separate(word, c("word1", "word2"), sep = " ") %>% 
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  unite(word,word1, word2, sep = " ") %>% 
+  count(word, sort = TRUE) %>% 
+  slice(1:15) %>% 
+  ggplot() + geom_bar(aes(word, n), stat = "identity", fill = '#86bf91') +
+  coord_flip() +
+  labs(title = "Top Bigrams of Tweets Data",
+       caption = "Twitter Data", x = NULL, y = NULL)
+
+
+```
+
+
+
+```{r message=FALSE, warning=FALSE}
+guardian_df %>% 
+  unnest_tokens(word, text, token = "ngrams", n = 2) %>% 
+  separate(word, c("word1", "word2"), sep = " ") %>% 
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  unite(word,word1, word2, sep = " ") %>% 
+  count(word, sort = TRUE) %>% 
+  slice(1:15) %>% 
+  ggplot() + geom_bar(aes(word, n), stat = "identity", fill = '#86bf91') +
+  coord_flip() +
+  labs(title = "Top Bigrams of Guardian Articles",
+       caption = "The Guardian Articles", x = NULL, y = NULL)
+
+```
+
+## Visualizing a network of Bigrams
+
+By visualizing bigrams we can see the two words relationship. We can there are different clusters, in addition there are two big cluster indicating the main hashtags in the twitters data set. Such as Johnny Depp, Amber Heard and other words such as loved and testimony are closely linked. 
+
+```{r message=FALSE, warning=FALSE}
+# twitter data
+tweets_bigrams <- twitter_df %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+
+# group bigrams by has
+bigrams_separated <- tweets_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+# counts
+bigram_counts <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  count(word1, word2, sort = TRUE) 
+
+# graph
+bigram_graph <- bigram_counts %>% 
+  filter(n > 90) %>%
+  as_tbl_graph()
+
+arrow <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+# ggplot
+ggraph(bigram_graph, layout = "fr") + 
+  geom_edge_link(aes(alpha = n), show.legend = F, 
+                 arrow = arrow, end_cap = circle(0.07, "inches")) + 
+  geom_node_point(color = '#86bf91', size = 5) + 
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+```
+### The Guardian Titles
+
+The below graph shows the guardian titles and text relationship. We can see there a few clusters such as _Heard_ is related to court, testified, write, acussed and others. 
+
+```{r message=FALSE, warning=FALSE}
+articles_bigrams <- guardian_df %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+
+# group bigrams by has
+bigrams_separated <- articles_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+bigram_counts <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  count(word1, word2, sort = TRUE) 
+
+bigram_graph <- bigram_counts %>% 
+  filter(n > 4) %>%
+  as_tbl_graph()
+set.seed(123)
+arrow <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+
+ggraph(bigram_graph, layout = "fr") + 
+  geom_edge_link(aes(alpha = n), show.legend = F, 
+                 arrow = arrow, end_cap = circle(0.07, "inches")) + 
+  geom_node_point(color = '#86bf91', size = 5) + 
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+```
+
+
+## Topic Modeling 
+
+In the previous sections we have seen that there are a very large collection fo Tweets and Articles. It is important to divide them into natural groups to make comprehension easier. Topic modeling is a method which finds natural groups of items in the text. One of the popular methods of topic modeling is LDA. This methodologies allows text documents to overlap the content and shows the use of natural language. I used LDA to group tweets and articles data into groups. My assumption is there would be similar groups. As we have seen that both data sources have mostly sentiment and common words, it is expected to have similar groups. For the twitter data set, I use _k = 2_ to create four-topic LDA model. To build a LDA model, we require to have a Document Term Matrix. In order to achieve this, first I use the tokenized words both from Twitter and the Guardian to  them into LDA model. 
+
+### Twitter
+
+Topic modeling for the twitter data provides a very well representation of the trail. We can see that in first topic _Justice for Johnny Depp_ has the  highest score, along with this we can also see other tags such as _Amber heard is a Psychopath_ and others 
+
+```{r message=FALSE, warning=FALSE}
+
+set.seed(123)
+# count words by tweets and DTM
+tweets_dtm <- tidy_tweets %>% count(id, word) %>% cast_dtm(id, word, n)
+
+# LDA
+tweets_lda <- LDA(tweets_dtm, k = 2, control = list(seed = 123))
+
+# check topics
+tweets_topics <- tidy(tweets_lda, matrix = "beta")
+
+tweets_top_terms <- tweets_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+tweets_top_terms %>%
+  mutate(term = reorder(term, beta)) %>%
+  ggplot(aes(reorder(term, beta), beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE, fill = '#86bf91') +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip() +
+  labs(x = NULL, y = "Probability", title = "Top 10 Tweets Topics ") 
+
+
+```
+
+The below graphs shows the topic differenrce wbtween tweeter data. 
+
+```{r message=FALSE, warning=FALSE}
+# calculate differences in beta between topics
+beta_spread_tweets <- tweets_topics %>%
+  mutate(topic = paste0("topic", topic)) %>%
+  pivot_wider(names_from = topic, values_from = beta) %>% 
+  filter(topic1 > .001 | topic2 > .001) %>%
+  mutate(log_ratio = log2(topic2 / topic1))
+
+# create plot
+beta_spread_tweets %>% 
+  top_n(20, abs(log_ratio)) %>%
+  mutate(term = reorder(term, log_ratio)) %>%
+  ggplot(aes(term, log_ratio, fill = log_ratio < 0)) +
+  geom_col(show.legend = F, fill = '#86bf91') +
+  coord_flip() +
+  labs(x = NULL, y = "Probability", title = "Top 10 topics ") +
+  labs(x = 'term',  y = "Log2 Ratio of Beta in Topic 2/Topic 1", title = 'Greatest Differences in Tweets Topics')
+```
+
+
+
+
+### The Guardian 
+
+In the Guardian Articles we can see small differences in the words, indicating these articles to be the same on average. The highest two words in the both topics are _Heard_ and _Depp_
+
+```{r message=FALSE, warning=FALSE}
+# count words by articles and DTM
+articles_dtm <- tidy_articles %>% count(id, word) %>% cast_dtm(id, word, n)
+
+# LDA
+articles_lda <- LDA(articles_dtm, k = 2, control = list(seed = 123))
+
+# check topics
+articles_topics <- tidy(articles_lda, matrix = "beta")
+
+articles_top_terms <- articles_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+articles_top_terms %>%
+  mutate(term = reorder(term, beta)) %>%
+  ggplot(aes(reorder(term, beta), beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE, fill = '#86bf91') +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip() +
+  labs(x = NULL, y = "Probability", title = "Top 10 Articles Topics ")
+
+
+
+```
+
+```{r message=FALSE, warning=FALSE}
+# calculate differences in beta between topics
+beta_spread_articles <- articles_topics %>%
+  mutate(topic = paste0("topic", topic)) %>%
+  pivot_wider(names_from = topic, values_from = beta) %>% 
+  filter(topic1 > .001 | topic2 > .001) %>%
+  mutate(log_ratio = log2(topic2 / topic1))
+
+# create plot
+beta_spread_articles %>% 
+  top_n(20, abs(log_ratio)) %>%
+  mutate(term = reorder(term, log_ratio)) %>%
+  ggplot(aes(term, log_ratio, fill = log_ratio < 0)) +
+  geom_col(show.legend = F, fill = '#86bf91') +
+  coord_flip() +
+  labs(x = NULL, y = "Probability", title = "Top 10 topics ") +
+  labs(x = 'term',  y = "Log2 Ratio of Beta in Topic 2/Topic 1", title = 'Greatest Differences in articles Topics')
+```
+
+
+
+## Word Co-ocurrences and Correlations
+
+In this part, i wanted to measure co-occurrences and correlation of the Guardian articles and the description. We can see a cluster of the words such as : Heard, Johnny, Court, Amber, with strong relationships to voilence, abuse and defamation. 
+
+```{r message=FALSE, warning=FALSE}
+
+# get words that occur together frequently
+title_word_pairs <- guardian_df %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words, by = "word")
+
+title_word_pairs <- title_word_pairs %>% 
+  pairwise_count(word, title, sort = TRUE, upper = FALSE)
+
+# plot them on a network
+set.seed(1234)
+title_word_pairs %>%
+  filter(n >= 15) %>%
+  graph_from_data_frame() %>%
+  ggraph(layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour = '#86bf91') +
+  geom_node_point(size = 5) +
+  geom_node_text(aes(label = name), repel = TRUE, 
+                 point.padding = unit(0.2, "lines")) +
+  ggtitle('Most Frequent Co-occuring Words') +
+  theme(plot.title = element_text( size = 12, face = "bold", hjust = 0.5 ) )
+```
+
+## Conclusion 
+
+In conclusion, the main aim of this project was to evaluate different medial sources and evaluate how the key characters are associated. We have seen that in large number of tweets Amber Heard receive hate speech which proofs the hypothesis. In addition to the Guardian articles, we observed that these articles provide a well description of the on going trail however it does not provide strong evidence to support the hypothesis.Future Research Opportunities:  there are he is a great opportunity for other analysts to add more articles and use advanced machine learning tools to analyze the hypothesis. 
+
+
+
+
+
